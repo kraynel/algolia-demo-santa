@@ -6,7 +6,7 @@ $(document).ready(function () {
   var APPLICATION_ID = 'latency';
   var SEARCH_ONLY_API_KEY = '6be0576ff61c053d5f9a3225e2a90f76';
   var INDEX_NAME = 'demo-geosearch';
-  var PARAMS = {hitsPerPage: 60};
+  var PARAMS = { hitsPerPage: 60 };
 
   // Client + Helper initialization
   var algolia = algoliasearch(APPLICATION_ID, SEARCH_ONLY_API_KEY);
@@ -27,7 +27,7 @@ $(document).ready(function () {
     zoom: 4,
     minZoom: 3,
     maxZoom: 12,
-    styles: [{stylers: [{hue: '#3596D2'}]}]
+    styles: [{ stylers: [{ hue: '#3596D2' }] }],
   });
   var fitMapToMarkersAutomatically = true;
   var markers = [];
@@ -42,10 +42,11 @@ $(document).ready(function () {
     AROUND_IP: 4,
     AROUND_NYC: 5,
     AROUND_LONDON: 6,
-    AROUND_SYDNEY: 7
+    AROUND_SYDNEY: 7,
+    AROUND_CARSON: 8,
   };
   var pageState = PAGE_STATES.LOAD;
-  setPageState(PAGE_STATES.BOUNDING_BOX_RECTANGLE);
+  setPageState(PAGE_STATES.BOUNDING_BOX_POLYGON);
 
   // PAGE STATES
   // ===========
@@ -60,7 +61,7 @@ $(document).ready(function () {
     switch (state) {
       case PAGE_STATES.BOUNDING_BOX_RECTANGLE:
         boundingBox = new google.maps.Rectangle({
-          bounds: {north: 60, south: 40, east: 16, west: -4},
+          bounds: { north: 60, south: 40, east: 16, west: -4 },
           strokeColor: '#EF5362',
           strokeOpacity: 0.8,
           strokeWeight: 2,
@@ -69,33 +70,30 @@ $(document).ready(function () {
           draggable: true,
           editable: true,
           geodesic: true,
-          map: map
+          map: map,
         });
-        algoliaHelper.setQueryParameter('insideBoundingBox', rectangleToAlgoliaParams(boundingBox));
-        boundingBoxListeners.push(google.maps.event.addListener(
-          boundingBox,
-          'bounds_changed',
-          throttle(rectangleBoundsChanged, 150)
-        ));
+        algoliaHelper.setQueryParameter(
+          'insideBoundingBox',
+          rectangleToAlgoliaParams(boundingBox)
+        );
+        boundingBoxListeners.push(
+          google.maps.event.addListener(
+            boundingBox,
+            'bounds_changed',
+            throttle(rectangleBoundsChanged, 150)
+          )
+        );
         break;
 
       case PAGE_STATES.BOUNDING_BOX_POLYGON:
         boundingBox = new google.maps.Polygon({
           paths: [
-          {lat: 42.01, lng: -124.31},
-          {lat: 42.00, lng: -120.01},
-          {lat: 39.01, lng: -120.01},
-          {lat: 35.00, lng: -114.64},
-          {lat: 36.99, lng: -114.03},
-          {lat: 36.99, lng: -109.05},
-          {lat: 31.36, lng: -109.05},
-          {lat: 31.36, lng: -111.09},
-          {lat: 32.48, lng: -114.89},
-          {lat: 32.75, lng: -114.76},
-          {lat: 32.37, lng: -121.20},
-          {lat: 40.09, lng: -125.81},
-          {lat: 42.01, lng: -125.94},
-          {lat: 42.01, lng: -124.31}
+            { lat: 33.636719, lng: -84.428067 }, // ATL
+            { lat: 47.449, lng: -122.309306 }, // SEA
+            { lat: 33.9486, lng: -83.3263 }, // AHN
+            { lat: 40.777245, lng: -73.872608 }, // LGA
+            { lat: 40.639751, lng: -73.778925 }, // JFK
+            { lat: 32.69285, lng: -83.649211 }, // MCN
           ],
           strokeColor: '#EF5362',
           strokeOpacity: 0.8,
@@ -103,21 +101,28 @@ $(document).ready(function () {
           fillColor: '#EF5362',
           fillOpacity: 0.15,
           draggable: true,
-          editable: true,
+          // editable: true,
           geodesic: true,
-          map: map
+          map: map,
         });
-        algoliaHelper.setQueryParameter('insidePolygon', polygonsToAlgoliaParams(boundingBox));
-        boundingBoxListeners.push(google.maps.event.addListener(
-          boundingBox.getPath(),
-          'set_at',
-          throttle(polygonBoundsChanged, 150)
-        ));
-        boundingBoxListeners.push(google.maps.event.addListener(
-          boundingBox.getPath(),
-          'insert_at',
-          throttle(polygonBoundsChanged, 150)
-        ));
+        algoliaHelper.setQueryParameter(
+          'insidePolygon',
+          polygonsToAlgoliaParams(boundingBox)
+        );
+        boundingBoxListeners.push(
+          google.maps.event.addListener(
+            boundingBox.getPath(),
+            'set_at',
+            throttle(polygonBoundsChanged, 150)
+          )
+        );
+        boundingBoxListeners.push(
+          google.maps.event.addListener(
+            boundingBox.getPath(),
+            'insert_at',
+            throttle(polygonBoundsChanged, 150)
+          )
+        );
         break;
 
       case PAGE_STATES.AROUND_IP:
@@ -136,8 +141,13 @@ $(document).ready(function () {
         algoliaHelper.setQueryParameter('aroundLatLng', '-33.86, 151.20');
         break;
 
+      case PAGE_STATES.AROUND_CARSON:
+        algoliaHelper.setQueryParameter('aroundLatLng', '36.3102, -106.0401');
+        algoliaHelper.setQueryParameter('aroundRadius', '60000');
+        break;
+
       default:
-        // No-op
+      // No-op
     }
 
     fitMapToMarkersAutomatically = true;
@@ -162,7 +172,10 @@ $(document).ready(function () {
   // ===============
   $searchInput.on('input propertychange', function (e) {
     var query = e.currentTarget.value;
-    if (pageState === PAGE_STATES.BOUNDING_BOX_RECTANGLE || pageState === PAGE_STATES.BOUNDING_BOX_POLYGON) {
+    if (
+      pageState === PAGE_STATES.BOUNDING_BOX_RECTANGLE ||
+      pageState === PAGE_STATES.BOUNDING_BOX_POLYGON
+    ) {
       fitMapToMarkersAutomatically = false;
     }
     algoliaHelper.setQuery(query).search();
@@ -187,9 +200,11 @@ $(document).ready(function () {
     content.hits = content.hits.slice(0, 20);
     for (var i = 0; i < content.hits.length; ++i) {
       var hit = content.hits[i];
-      hit.displayCity = (hit.name === hit.city);
+      hit.displayCity = hit.name === hit.city;
       if (hit._rankingInfo.matchedGeoLocation) {
-        hit.distance = parseInt(hit._rankingInfo.matchedGeoLocation.distance / 1000, 10) + ' km';
+        hit.distance =
+          parseInt(hit._rankingInfo.matchedGeoLocation.distance / 1000, 10) +
+          ' km';
       }
     }
     $hits.html(hitsTemplate.render(content));
@@ -202,10 +217,10 @@ $(document).ready(function () {
     for (var i = 0; i < content.hits.length; ++i) {
       var hit = content.hits[i];
       var marker = new google.maps.Marker({
-        position: {lat: hit._geoloc.lat, lng: hit._geoloc.lng},
+        position: { lat: hit._geoloc.lat, lng: hit._geoloc.lng },
         map: map,
         airport_id: hit.objectID,
-        title: hit.name + ' - ' + hit.city + ' - ' + hit.country
+        title: hit.name + ' - ' + hit.city + ' - ' + hit.country,
       });
       markers.push(marker);
       attachInfoWindow(marker, hit);
@@ -238,8 +253,11 @@ $(document).ready(function () {
       case 'sydney':
         setPageState(PAGE_STATES.AROUND_SYDNEY);
         break;
+      case 'carson':
+        setPageState(PAGE_STATES.AROUND_CARSON);
+        break;
       default:
-        // No op
+      // No op
     }
   });
 
@@ -268,11 +286,18 @@ $(document).ready(function () {
 
   function rectangleBoundsChanged() {
     fitMapToMarkersAutomatically = false;
-    algoliaHelper.setQueryParameter('insideBoundingBox', rectangleToAlgoliaParams(boundingBox)).search();
+    algoliaHelper
+      .setQueryParameter(
+        'insideBoundingBox',
+        rectangleToAlgoliaParams(boundingBox)
+      )
+      .search();
   }
   function polygonBoundsChanged() {
     fitMapToMarkersAutomatically = false;
-    algoliaHelper.setQueryParameter('insidePolygon', polygonsToAlgoliaParams(boundingBox)).search();
+    algoliaHelper
+      .setQueryParameter('insidePolygon', polygonsToAlgoliaParams(boundingBox))
+      .search();
   }
 
   function rectangleToAlgoliaParams(rectangle) {
@@ -302,9 +327,11 @@ $(document).ready(function () {
       message = hit.name + ' - ' + hit.city + ' - ' + hit.country;
     }
 
-    var infowindow = new google.maps.InfoWindow({content: message});
+    var infowindow = new google.maps.InfoWindow({ content: message });
     marker.addListener('click', function () {
-      setTimeout(function () {infowindow.close();}, 3000);
+      setTimeout(function () {
+        infowindow.close();
+      }, 3000);
     });
   }
 
